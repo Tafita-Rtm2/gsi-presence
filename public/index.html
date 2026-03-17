@@ -1,1 +1,44 @@
-
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GSI Présence System</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0D1117;color:#E6EDF3;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.c{text-align:center;max-width:500px}
+.logo{width:80px;height:80px;background:#2D4EF5;border-radius:22px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:26px;margin:0 auto 28px}
+h1{font-family:'Syne',sans-serif;font-size:32px;font-weight:800;margin-bottom:10px}
+p{color:rgba(255,255,255,.5);font-size:15px;margin-bottom:36px;line-height:1.6}
+.btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.btn{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 32px;border-radius:18px;text-decoration:none;border:1px solid rgba(255,255,255,.08);background:#161B22;transition:all .2s;min-width:160px}
+.btn:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.15)}
+.btn-icon{font-size:32px}
+.btn-label{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
+.btn-desc{font-size:11px;color:rgba(255,255,255,.4)}
+.btn-admin{border-color:rgba(45,78,245,.3)}.btn-admin:hover{border-color:rgba(45,78,245,.6)}
+.btn-scan{border-color:rgba(16,185,129,.3)}.btn-scan:hover{border-color:rgba(16,185,129,.6)}
+</style>
+</head>
+<body>
+<div class="c">
+  <div class="logo">GSI</div>
+  <h1>GSI Présence System</h1>
+  <p>Système de gestion de présence par QR Code<br>Groupe GSI Internationale — Antananarivo</p>
+  <div class="btns">
+    <a href="/admin" class="btn btn-admin">
+      <span class="btn-icon">🛡️</span>
+      <span class="btn-label">Administration</span>
+      <span class="btn-desc">Gérer membres, présences, stats</span>
+    </a>
+    <a href="/scan" class="btn btn-scan">
+      <span class="btn-icon">📷</span>
+      <span class="btn-label">Scanner QR</span>
+      <span class="btn-desc">Scanner et valider les entrées</span>
+    </a>
+  </div>
+</div>
+</body>
+</html>
