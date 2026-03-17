@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: gsi-presence-system
+    runtime: node
+    buildCommand: npm install
+    startCommand: node server/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: ADMIN_SECRET_CODE
+        generateValue: false
+        # ⚠️  DÉFINISSEZ CETTE VALEUR MANUELLEMENT DANS RENDER DASHBOARD
+      - key: JWT_SECRET
+        generateValue: true
+      - key: QR_SALT
+        generateValue: true
