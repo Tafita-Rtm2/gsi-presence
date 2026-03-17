@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Administration — GSI Présence</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#2D4EF5;--blue-d:#1A36D9;--blue-l:rgba(45,78,245,.12);
+  --green:#10B981;--red:#EF4444;--orange:#F59E0B;--purple:#8B5CF6;
+  --bg:#0D1117;--surf:#161B22;--surf2:#1C2333;--border:rgba(255,255,255,.08);
+  --text:#E6EDF3;--muted:rgba(255,255,255,.45);
+  --sb:260px;--hh:62px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex}
+
+/* ── LOGIN ────── */
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:1000}
+.lbox{background:var(--surf);border:1px solid var(--border);border-radius:22px;padding:44px;width:100%;max-width:400px;text-align:center}
+.llogo{width:60px;height:60px;background:var(--blue);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:20px;margin:0 auto 20px}
+.lbox h1{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;margin-bottom:6px}
+.lbox p{color:var(--muted);font-size:13px;margin-bottom:28px}
+.inp{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-size:14px;outline:none;margin-bottom:12px;font-family:'Inter',sans-serif}
+.inp:focus{border-color:var(--blue)}
+select.inp option{background:var(--bg)}
+textarea.inp{resize:vertical;min-height:80px}
+.lerr{color:#FC8181;font-size:12px;margin-top:8px;display:none}
+
+/* ── BUTTONS ─── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .18s;font-family:'Inter',sans-serif;text-decoration:none;color:var(--text)}
+.btn-p{background:var(--blue);color:#fff}.btn-p:hover{background:var(--blue-d)}
+.btn-g{background:rgba(255,255,255,.07);border:1px solid var(--border)}.btn-g:hover{background:rgba(255,255,255,.12)}
+.btn-d{background:rgba(239,68,68,.12);color:#FC8181;border:1px solid rgba(239,68,68,.2)}.btn-d:hover{background:rgba(239,68,68,.22)}
+.btn-s{padding:6px 13px;font-size:12px;border-radius:7px}
+.btn-full{width:100%}
+.btn-icon{padding:7px 10px}
+
+/* ── SIDEBAR ─── */
+.sidebar{width:var(--sb);background:var(--surf);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;transition:transform .3s}
+.sb-logo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-icon{width:36px;height:36px;background:var(--blue);border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:12px;flex-shrink:0}
+.sb-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;line-height:1.2}
+.sb-name small{font-size:10px;color:var(--muted);font-weight:400;display:block}
+.sb-nav{flex:1;padding:14px 10px;overflow-y:auto}
+.nav-sec{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;padding:8px 8px 3px;margin-top:6px}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;font-size:13px;transition:all .15s;color:var(--muted);margin-bottom:1px}
+.ni:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.ni.act{background:var(--blue-l);color:var(--blue);font-weight:600}
+.ni .ico{width:18px;text-align:center;font-size:14px}
+.ni .badge-count{margin-left:auto;background:rgba(239,68,68,.2);color:#FC8181;border-radius:100px;padding:1px 7px;font-size:10px;font-weight:700}
+.sb-foot{padding:14px 10px;border-top:1px solid var(--border)}
+.live-pill{display:flex;align-items:center;gap:7px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:8px 12px;font-size:11px;color:#6EE7B7}
+.ldot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── MAIN ─────── */
+.main{margin-left:var(--sb);flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.header{height:var(--hh);background:var(--surf);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:20px;cursor:pointer}
+.page-title{font-family:'Syne',sans-serif;font-size:17px;font-weight:700}
+.hdr-r{display:flex;align-items:center;gap:10px}
+.scan-pill{background:rgba(45,78,245,.12);border:1px solid rgba(45,78,245,.25);border-radius:8px;padding:5px 12px;font-size:12px;color:var(--blue);font-weight:600}
+
+/* ── CONTENT ─── */
+.content{flex:1;overflow-y:auto;padding:24px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.1) transparent}
+.view{display:none}.view.act{display:block}
+
+/* ── CARDS / GRIDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.sc{background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.sc::after{content:'';position:absolute;top:0;right:0;width:70px;height:70px;border-radius:0 0 0 100%;opacity:.15}
+.sc.bl::after{background:var(--blue)}.sc.gr::after{background:var(--green)}.sc.or::after{background:var(--orange)}.sc.pu::after{background:var(--purple)}.sc.re::after{background:var(--red)}
+.sc .ico{font-size:20px;margin-bottom:10px}
+.sc .lbl{font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:500}
+.sc .num{font-family:'Syne',sans-serif;font-size:28px;font-weight:800}
+.sc.bl .num{color:var(--blue)}.sc.gr .num{color:var(--green)}.sc.or .num{color:var(--orange)}.sc.pu .num{color:var(--purple)}.sc.re .num{color:var(--red)}
+.sc .sub{font-size:11px;color:var(--muted);margin-top:3px}
+
+.card{background:var(--surf);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:18px}
+.ch{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ch h3{font-family:'Syne',sans-serif;font-size:14px;font-weight:700}
+.cb{padding:18px}
+
+/* ── TABLE ──── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+tbody tr{border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody tr:last-child{border-bottom:none}
+td{padding:10px 12px;font-size:13px}
+.uc{display:flex;align-items:center;gap:9px}
+.av{width:34px;height:34px;border-radius:9px;background:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--blue);flex-shrink:0;overflow:hidden}
+.av img{width:100%;height:100%;object-fit:cover}
+.un{font-weight:600;font-size:13px}
+.uid{font-size:11px;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:100px;font-size:10px;font-weight:600}
+.bb{background:rgba(45,78,245,.14);color:#7B9BFF}
+.bg{background:rgba(16,185,129,.14);color:#6EE7B7}
+.bo{background:rgba(245,158,11,.14);color:#FCD34D}
+.br{background:rgba(239,68,68,.14);color:#FC8181}
+.bp{background:rgba(139,92,246,.14);color:#C4B5FD}
+.bact{display:flex;gap:5px}
+
+/* ── TOOLBAR ── */
+.tb{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.sb-inp{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:7px 11px;flex:1;min-width:180px}
+.sb-inp input{background:none;border:none;color:var(--text);outline:none;font-size:13px;width:100%;font-family:'Inter',sans-serif}
+.fsel{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:7px 11px;color:var(--text);font-size:13px;outline:none;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* ── LIVE FEED ── */
+.feed{max-height:320px;overflow-y:auto}
+.fi{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.04);animation:fIn .25s ease}
+@keyframes fIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.fi:last-child{border-bottom:none}
+.fi-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.fi-dot.ok{background:var(--green)}.fi-dot.dup{background:var(--orange)}.fi-dot.err{background:var(--red)}
+.fi-info{flex:1}
+.fi-name{font-weight:600;font-size:13px}
+.fi-meta{font-size:11px;color:var(--muted)}
+.fi-time{font-size:11px;color:var(--muted);font-family:monospace}
+
+/* ── WEEKLY CHART ── */
+.wchart{display:flex;align-items:flex-end;gap:8px;height:130px;padding-top:8px}
+.wbar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.wb-fill{width:100%;background:var(--blue);border-radius:4px 4px 0 0;transition:height .5s;opacity:.8;min-height:4px}
+.wb-n{font-size:9px;color:var(--muted)}
+.wb-l{font-size:9px;color:var(--muted);text-align:center}
+
+/* ── MODAL ────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:500;padding:16px}
+.modal{background:var(--surf);border:1px solid var(--border);border-radius:18px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;scrollbar-width:thin}
+.mh{padding:20px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surf);z-index:1}
+.mh h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700}
+.mclose{background:none;border:none;color:var(--muted);cursor:pointer;font-size:22px;line-height:1;padding:2px 7px;border-radius:5px}
+.mclose:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.mb{padding:22px}
+.mf{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:9px}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:12px;font-weight:500;margin-bottom:5px}
+
+/* ── PHOTO UPLOAD ── */
+.ph-up{border:2px dashed var(--border);border-radius:11px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s}
+.ph-up:hover{border-color:var(--blue)}
+.ph-up input{display:none}
+.ph-prev{width:70px;height:70px;border-radius:10px;object-fit:cover;margin:0 auto 8px;display:block}
+
+/* ── QR CARD ─── */
+.qr-card{background:linear-gradient(135deg,#2D4EF5,#1A36D9);border-radius:18px;overflow:hidden;max-width:320px;margin:0 auto;font-family:'Syne',sans-serif}
+.qrc-head{padding:18px;display:flex;align-items:center;justify-content:space-between}
+.qrc-logo{display:flex;align-items:center;gap:10px}
+.qrc-logobox{width:36px;height:36px;background:rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#fff}
+.qrc-logotxt{color:#fff;font-size:13px;font-weight:700;line-height:1.2}
+.qrc-logotxt small{font-size:10px;color:rgba(255,255,255,.65);font-family:'Inter',sans-serif;font-weight:400;display:block}
+.qrc-user{padding:0 18px 16px;display:flex;align-items:center;gap:12px}
+.qrc-av{width:50px;height:50px;border-radius:10px;background:rgba(255,255,255,.2);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0}
+.qrc-av img{width:100%;height:100%;object-fit:cover}
+.qrc-name{color:#fff;font-size:15px;font-weight:700}
+.qrc-id{color:rgba(245,166,35,.9);font-size:11px;font-family:'Inter',sans-serif;margin-top:2px}
+.qrc-body{background:#fff;padding:18px;border-radius:0 0 18px 18px}
+.qrc-qr{text-align:center;margin-bottom:14px}
+.qrc-qr img{max-width:170px;border-radius:6px}
+.qrc-info{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+.qrc-row{display:flex;align-items:center;gap:7px;font-size:11px;color:#374151;font-family:'Inter',sans-serif}
+.qrc-row span:first-child{color:var(--blue);font-size:13px}
+.qrc-note{text-align:center;font-size:9px;color:#9CA3AF;letter-spacing:.4px;font-family:'Inter',sans-serif;text-transform:uppercase}
+
+/* ── PROFILE VIEW ── */
+.profile-header{background:var(--surf);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:18px;display:flex;align-items:center;gap:20px}
+.profile-av{width:80px;height:80px;border-radius:16px;background:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--blue);flex-shrink:0;overflow:hidden}
+.profile-av img{width:100%;height:100%;object-fit:cover}
+.profile-name{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:4px}
+.profile-meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+.profile-back{margin-bottom:16px}
+
+/* ── PRESENCE CALENDAR ── */
+.cal-controls{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.cal-sel{display:flex;gap:8px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.cal-day-hdr{text-align:center;font-size:10px;color:var(--muted);font-weight:600;padding:4px 0;text-transform:uppercase}
+.cal-day{aspect-ratio:1;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:default;transition:all .15s;position:relative}
+.cal-day.present{background:rgba(16,185,129,.2);color:#6EE7B7;font-weight:600}
+.cal-day.absent{background:rgba(239,68,68,.1);color:rgba(239,68,68,.6)}
+.cal-day.today{outline:2px solid var(--blue);outline-offset:1px}
+.cal-day.empty{opacity:0}
+.cal-day.weekend{opacity:.4}
+.cal-legend{display:flex;gap:14px;margin-top:10px;font-size:11px;color:var(--muted)}
+.cal-legend span{display:flex;align-items:center;gap:5px}
+.leg-dot{width:10px;height:10px;border-radius:3px}
+
+/* ── PRESENCE SUMMARY ── */
+.psum{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.ps{background:var(--bg);border:1px solid var(--border);border-radius:11px;padding:14px;text-align:center}
+.ps .pn{font-family:'Syne',sans-serif;font-size:24px;font-weight:800}
+.ps .pl{font-size:10px;color:var(--muted);margin-top:3px;text-transform:uppercase}
+.ps .pbar{height:3px;background:rgba(255,255,255,.07);border-radius:2px;margin-top:9px;overflow:hidden}
+.ps .pbfill{height:100%;border-radius:2px;transition:width .5s}
+
+/* ── ABSENCE ALERT ── */
+.abs-alert{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:flex-start;gap:12px}
+.abs-alert-ico{font-size:20px;flex-shrink:0}
+.abs-alert-body h4{font-size:14px;font-weight:600;color:#FC8181;margin-bottom:4px}
+.abs-alert-body p{font-size:12px;color:var(--muted)}
+.abs-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.abs-chip{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.18);border-radius:100px;padding:2px 10px;font-size:11px;color:#FC8181}
+
+/* ── TOAST ───── */
+.toasts{position:fixed;bottom:22px;right:22px;display:flex;flex-direction:column;gap:7px;z-index:9999}
+.toast{background:var(--surf2);border:1px solid var(--border);border-radius:11px;padding:12px 16px;font-size:13px;max-width:300px;display:flex;align-items:center;gap:9px;animation:tIn .25s ease;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+@keyframes tIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.toast.s{border-color:rgba(16,185,129,.3)}.toast.e{border-color:rgba(239,68,68,.3)}
+
+/* ── SIDEBAR OVERLAY ── */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99}
+.sb-overlay.show{display:block}
+
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}
+  .sb-overlay.show{display:block}.main{margin-left:0}.hamburger{display:block}
+  .frow{grid-template-columns:1fr}.psum{grid-template-columns:1fr 1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="lbox">
+    <div class="llogo">GSI</div>
+    <h1>Administration</h1>
+    <p>Entrez le code d'accès sécurisé</p>
+    <input type="password" class="inp" id="lcode" placeholder="••••••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-p btn-full" onclick="doLogin()">🔐 Accéder</button>
+    <div class="lerr" id="lerr">❌ Code incorrect</div>
+  </div>
+</div>
+
+<div class="sb-overlay" id="sb-overlay" onclick="closeSB()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-logo">
+    <div class="sb-icon">GSI</div>
+    <div class="sb-name">Groupe GSI Int.<small>Administration</small></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="nav-sec">Principal</div>
+    <div class="ni act" onclick="goView('dashboard',this)"><span class="ico">📊</span>Tableau de bord</div>
+    <div class="ni" onclick="goView('presences',this)"><span class="ico">✅</span>Présences du jour</div>
+    <div class="ni" id="ni-absences" onclick="goView('absences',this)"><span class="ico">⚠️</span>Absences<span class="badge-count" id="abs-count">0</span></div>
+    <div class="nav-sec">Membres</div>
+    <div class="ni" onclick="goView('etudiants',this)"><span class="ico">🎓</span>Étudiants</div>
+    <div class="ni" onclick="goView('professeurs',this)"><span class="ico">👨‍🏫</span>Professeurs</div>
+    <div class="ni" onclick="goView('travailleurs',this)"><span class="ico">💼</span>Travailleurs</div>
+    <div class="nav-sec">Outils</div>
+    <div class="ni" onclick="goView('scanner-upload',this)"><span class="ico">📷</span>Scanner (upload)</div>
+    <div class="ni" onclick="goView('import-etudiant',this)"><span class="ico">📥</span>Import Étudiant</div>
+  </nav>
+  <div class="sb-foot">
+    <div class="live-pill"><div class="ldot"></div>Temps réel actif</div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main" id="main" style="display:none">
+  <div class="header">
+    <div class="hdr-l">
+      <button class="hamburger" onclick="toggleSB()">☰</button>
+      <div class="page-title" id="ptitle">Tableau de bord</div>
+    </div>
+    <div class="hdr-r">
+      <div class="scan-pill" id="scan-pill">⚡ 0 scans</div>
+      <button class="btn btn-p btn-s" onclick="openCreateModal()">+ Membre</button>
+      <button class="btn btn-g btn-s" onclick="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="view act" id="view-dashboard">
+      <div class="stat-grid">
+        <div class="sc bl"><div class="ico">🎓</div><div class="lbl">Étudiants</div><div class="num" id="d-et">—</div><div class="sub" id="d-etp">— présents</div></div>
+        <div class="sc gr"><div class="ico">👨‍🏫</div><div class="lbl">Professeurs</div><div class="num" id="d-pr">—</div><div class="sub" id="d-prp">— présents</div></div>
+        <div class="sc or"><div class="ico">💼</div><div class="lbl">Travailleurs</div><div class="num" id="d-tr">—</div><div class="sub" id="d-trp">— présents</div></div>
+        <div class="sc pu"><div class="ico">📷</div><div class="lbl">Scans aujourd'hui</div><div class="num" id="d-sc">—</div><div class="sub">Total: <span id="d-tot">—</span></div></div>
+        <div class="sc re"><div class="ico">⚠️</div><div class="lbl">Absents aujourd'hui</div><div class="num" id="d-ab">—</div><div class="sub" onclick="goView('absences')" style="cursor:pointer;color:var(--blue)">Voir les absents →</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="ch"><h3>📡 Activité en direct</h3></div>
+          <div class="cb"><div class="feed" id="live-feed"><div style="text-align:center;color:var(--muted);padding:30px;font-size:13px">En attente de scans...</div></div></div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>📅 Semaine en cours</h3></div>
+          <div class="cb"><div class="wchart" id="wchart"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESENCES DU JOUR -->
+    <div class="view" id="view-presences">
+      <div class="card">
+        <div class="ch">
+          <h3>✅ Présences — <span id="today-lbl"></span></h3>
+          <div class="tb">
+            <div class="sb-inp"><span>🔍</span><input placeholder="Rechercher..." oninput="filterPres(this.value)"></div>
+            <select class="fsel" onchange="filterPresType(this.value)">
+              <option value="">Tous types</option>
+              <option value="etudiant">🎓 Étudiants</option>
+              <option value="professeur">👨‍🏫 Professeurs</option>
+              <option value="travailleur">💼 Travailleurs</option>
+            </select>
+          </div>
+        </div>
+        <div class="psum">
+          <div class="ps"><div class="pn" id="ps-et" style="color:var(--blue)">0</div><div class="pl">Étudiants présents</div><div class="pbar"><div class="pbfill" id="pb-et" style="background:var(--blue);width:0%"></div></div></div>
+          <div class="ps"><div class="pn" id="ps-pr" style="color:var(--green)">0</div><div class="pl">Profs présents</div><div class="pbar"><div class="pbfill" id="pb-pr" style="background:var(--green);width:0%"></div></div></div>
+          <div class="ps"><div class="pn" id="ps-tr" style="color:var(--orange)">0</div><div class="pl">Travailleurs présents</div><div class="pbar"><div class="pbfill" id="pb-tr" style="background:var(--orange);width:0%"></div></div></div>
+        </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Membre</th><th>Type</th><th>Campus</th><th>Heure</th><th>Statut</th><th>Profil</th></tr></thead><tbody id="pres-tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ABSENCES -->
+    <div class="view" id="view-absences">
+      <div class="abs-alert">
+        <div class="abs-alert-ico">⚠️</div>
+        <div class="abs-alert-body">
+          <h4>Absences détectées aujourd'hui</h4>
+          <p>Ces membres n'ont pas encore scanné leur QR code aujourd'hui.</p>
+          <div class="abs-chips" id="abs-chips"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch">
+          <h3>⚠️ Liste des absents — <span id="abs-date"></span></h3>
+          <div class="tb">
+            <select class="fsel" onchange="filterAbsType(this.value)">
+              <option value="">Tous</option>
+              <option value="etudiant">🎓 Étudiants</option>
+              <option value="professeur">👨‍🏫 Professeurs</option>
+              <option value="travailleur">💼 Travailleurs</option>
+            </select>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table><thead><tr><th>Membre</th><th>Type</th><th>Campus</th><th>Email</th><th>Téléphone</th><th>Profil</th></tr></thead><tbody id="abs-tbody"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ÉTUDIANTS / PROFS / TRAVAILLEURS -->
+    <div class="view" id="view-etudiants">
+      <div class="card">
+        <div class="ch"><h3>🎓 Étudiants</h3><div class="tb"><div class="sb-inp"><span>🔍</span><input placeholder="Rechercher..." oninput="filterUsers(this.value,'etudiant')"></div><button class="btn btn-p btn-s" onclick="openCreateModal('etudiant')">+ Ajouter</button></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Étudiant</th><th>Campus</th><th>Filière</th><th>Niveau</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="tb-etudiants"></tbody></table></div>
+      </div>
+    </div>
+    <div class="view" id="view-professeurs">
+      <div class="card">
+        <div class="ch"><h3>👨‍🏫 Professeurs</h3><div class="tb"><div class="sb-inp"><span>🔍</span><input placeholder="Rechercher..." oninput="filterUsers(this.value,'professeur')"></div><button class="btn btn-p btn-s" onclick="openCreateModal('professeur')">+ Ajouter</button></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Professeur</th><th>Email</th><th>Téléphone</th><th>Poste</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="tb-professeurs"></tbody></table></div>
+      </div>
+    </div>
+    <div class="view" id="view-travailleurs">
+      <div class="card">
+        <div class="ch"><h3>💼 Travailleurs</h3><div class="tb"><div class="sb-inp"><span>🔍</span><input placeholder="Rechercher..." oninput="filterUsers(this.value,'travailleur')"></div><button class="btn btn-p btn-s" onclick="openCreateModal('travailleur')">+ Ajouter</button></div></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Travailleur</th><th>Email</th><th>Téléphone</th><th>Poste</th><th>Statut</th><th>Actions</th></tr></thead><tbody id="tb-travailleurs"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PROFIL MEMBRE -->
+    <div class="view" id="view-profile">
+      <div class="profile-back"><button class="btn btn-g btn-s" onclick="goBack()">← Retour</button></div>
+      <div class="profile-header" id="profile-header"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px">
+        <div class="sc gr"><div class="ico">✅</div><div class="lbl">Jours présents</div><div class="num" id="prof-pres">—</div><div class="sub" id="prof-pres-sub">—</div></div>
+        <div class="sc re"><div class="ico">❌</div><div class="lbl">Jours absents</div><div class="num" id="prof-abs">—</div><div class="sub" id="prof-abs-sub">—</div></div>
+      </div>
+      <div class="card">
+        <div class="ch">
+          <h3>📅 Calendrier de présence</h3>
+          <div class="cal-controls">
+            <div class="cal-sel">
+              <select class="fsel" id="cal-month" onchange="loadProfileCal()">
+                <option value="">Tous les mois</option>
+              </select>
+              <select class="fsel" id="cal-year" onchange="loadProfileCal()">
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="cb">
+          <div class="cal-grid" id="cal-grid"></div>
+          <div class="cal-legend">
+            <span><div class="leg-dot" style="background:rgba(16,185,129,.3)"></div>Présent</span>
+            <span><div class="leg-dot" style="background:rgba(239,68,68,.15)"></div>Absent</span>
+            <span><div class="leg-dot" style="outline:2px solid var(--blue);border-radius:3px"></div>Aujourd'hui</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><h3>📋 Historique des scans</h3></div>
+        <div class="tbl-wrap"><table><thead><tr><th>Date</th><th>Heure</th><th>Scan n°</th></tr></thead><tbody id="prof-hist"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- SCANNER UPLOAD -->
+    <div class="view" id="view-scanner-upload">
+      <div class="card" style="max-width:560px;margin:0 auto">
+        <div class="ch"><h3>📷 Scanner une image QR</h3></div>
+        <div class="cb">
+          <div class="ph-up" onclick="document.getElementById('qr-file').click()" id="qr-drop">
+            <input type="file" id="qr-file" accept="image/*" onchange="handleQRFile(this)">
+            <div style="font-size:44px;margin-bottom:10px">📷</div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:4px">Cliquer ou glisser une image</div>
+            <div style="font-size:12px;color:var(--muted)">JPG, PNG — Max 10MB</div>
+          </div>
+          <canvas id="qr-cv" style="display:none"></canvas>
+          <div id="qr-result" style="margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- IMPORT ÉTUDIANT -->
+    <div class="view" id="view-import-etudiant">
+      <div class="card" style="max-width:540px;margin:0 auto">
+        <div class="ch"><h3>📥 Importer un étudiant existant</h3></div>
+        <div class="cb">
+          <p style="color:var(--muted);font-size:13px;margin-bottom:18px">Pour un étudiant qui a déjà une carte GSI. Entrez le code QR tel qu'il apparaît sur sa carte.</p>
+          <div class="fg"><label>Code QR (texte scanné) *</label><input type="text" class="inp" id="imp-qr" placeholder="Code sur la carte ex: A3F7B2C1D4E5"></div>
+          <div class="frow">
+            <div class="fg"><label>Numéro étudiant *</label><input type="text" class="inp" id="imp-num" placeholder="12345678"></div>
+            <div class="fg"><label>Nom complet</label><input type="text" class="inp" id="imp-nom" placeholder="Nom Prénom"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Campus</label><input type="text" class="inp" id="imp-campus" value="ANTANANARIVO (ANALAKELY)"></div>
+            <div class="fg"><label>Niveau</label><input type="text" class="inp" id="imp-niv" placeholder="L1"></div>
+          </div>
+          <div class="fg"><label>Filière</label><input type="text" class="inp" id="imp-fil" placeholder="TOURISME, VOYAGE & HÔTELLERIE"></div>
+          <button class="btn btn-p btn-full" onclick="importStudent()">📥 Importer</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toasts" id="toasts"></div>
+
+<!-- CREATE MODAL -->
+<div class="overlay" id="create-modal" style="display:none" onclick="if(event.target===this)closeModal('create-modal')">
+  <div class="modal">
+    <div class="mh"><h3 id="modal-title">Nouveau membre</h3><button class="mclose" onclick="closeModal('create-modal')">×</button></div>
+    <div class="mb">
+      <div class="fg">
+        <label>Photo de profil</label>
+        <div class="ph-up" onclick="document.getElementById('ph-inp').click()" id="ph-drop">
+          <input type="file" id="ph-inp" accept="image/*" onchange="previewPh(this)">
+          <div id="ph-prev-area"><div style="font-size:32px;margin-bottom:6px">📸</div><div style="font-size:12px;color:var(--muted)">Cliquer pour uploader</div></div>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Nom complet *</label><input type="text" class="inp" id="f-nom" placeholder="Prénom Nom"></div>
+        <div class="fg"><label>Type *</label><select class="inp" id="f-type" onchange="updateFields()"><option value="etudiant">🎓 Étudiant</option><option value="professeur">👨‍🏫 Professeur</option><option value="travailleur">💼 Travailleur</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Email</label><input type="email" class="inp" id="f-email" placeholder="email@gsi.mg"></div>
+        <div class="fg"><label>Téléphone</label><input type="tel" class="inp" id="f-tel" placeholder="+261 XX XX XXX XX"></div>
+      </div>
+      <div class="fg"><label>Adresse</label><input type="text" class="inp" id="f-adr" placeholder="Adresse complète"></div>
+      <div id="et-fields">
+        <div class="frow">
+          <div class="fg"><label>Campus</label><input type="text" class="inp" id="f-campus" value="ANTANANARIVO (ANALAKELY)"></div>
+          <div class="fg"><label>Niveau</label><input type="text" class="inp" id="f-niv" placeholder="L1, L2, M1..."></div>
+        </div>
+        <div class="fg"><label>Filière</label><input type="text" class="inp" id="f-fil" placeholder="TOURISME, VOYAGE & HÔTELLERIE"></div>
+      </div>
+      <div id="st-fields" style="display:none">
+        <div class="fg"><label>Poste / Fonction</label><input type="text" class="inp" id="f-poste" placeholder="Ex: Directeur pédagogique"></div>
+        <div class="fg"><label>Mot de passe</label><input type="password" class="inp" id="f-pwd" placeholder="Min. 8 caractères"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeModal('create-modal')">Annuler</button>
+      <button class="btn btn-p" onclick="createUser()">✅ Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR MODAL -->
+<div class="overlay" id="qr-modal" style="display:none" onclick="if(event.target===this)closeModal('qr-modal')">
+  <div class="modal">
+    <div class="mh"><h3>Carte QR Code</h3><button class="mclose" onclick="closeModal('qr-modal')">×</button></div>
+    <div class="mb" id="qr-modal-body"></div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeModal('qr-modal')">Fermer</button>
+      <button class="btn btn-p" onclick="printQR()">🖨️ Imprimer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let token=null,allUsers=[],allPres=[],allAbsents=[],currentView='dashboard',prevView='dashboard',currentProfileId=null,socket=null;
+
+// ── AUTH ─────────────────────────────────────────────────────
+async function doLogin(){
+  const code=document.getElementById('lcode').value;
+  if(!code)return;
+  try{
+    const r=await fetch('/api/auth/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const d=await r.json();
+    if(!r.ok){document.getElementById('lerr').style.display='block';return;}
+    token=d.token;localStorage.setItem('gsi_admin_token',token);
+    document.getElementById('login').style.display='none';
+    document.getElementById('main').style.display='flex';
+    document.getElementById('main').style.flexDirection='column';
+    initApp();
+  }catch{document.getElementById('lerr').style.display='block';}
+}
+function logout(){localStorage.removeItem('gsi_admin_token');token=null;if(socket)socket.disconnect();location.reload();}
+async function autoLogin(){
+  const t=localStorage.getItem('gsi_admin_token');if(!t)return;
+  try{const r=await fetch('/api/auth/verify',{headers:{Authorization:'Bearer '+t}});
+    if(r.ok){token=t;document.getElementById('login').style.display='none';document.getElementById('main').style.display='flex';document.getElementById('main').style.flexDirection='column';initApp();}
+    else localStorage.removeItem('gsi_admin_token');
+  }catch{}
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+async function initApp(){
+  document.getElementById('today-lbl').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('abs-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  // Populate calendar year selector
+  const yrSel=document.getElementById('cal-year');
+  const curY=new Date().getFullYear();
+  for(let y=curY;y>=curY-3;y--){const o=document.createElement('option');o.value=y;o.textContent=y;if(y===curY)o.selected=true;yrSel.appendChild(o);}
+  const moSel=document.getElementById('cal-month');
+  const months=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  months.forEach((m,i)=>{const o=document.createElement('option');o.value=String(i+1).padStart(2,'0');o.textContent=m;if(i+1===new Date().getMonth()+1)o.selected=true;moSel.appendChild(o);});
+  await Promise.all([loadStats(),loadUsers(),loadPres()]);
+  initSocket();
+}
+
+// ── SOCKET ───────────────────────────────────────────────────
+function initSocket(){
+  socket=io();socket.emit('join-admin');
+  socket.on('scan-success',d=>{
+    addFeed(d.user?.nom_complet,d.user?.type,d.presence?.heure,d.presence?.is_duplicate?'dup':'ok');
+    loadStats();loadPres();
+  });
+  socket.on('scan-rejected',()=>addFeed('QR Inconnu','—',new Date().toLocaleTimeString('fr-FR'),'err'));
+  socket.on('user-created',()=>loadUsers());
+  socket.on('user-updated',()=>loadUsers());
+  socket.on('user-deleted',()=>loadUsers());
+}
+
+// ── API ───────────────────────────────────────────────────────
+async function api(path,opts={}){
+  const r=await fetch('/api'+path,{headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',...opts.headers},...opts});
+  return r;
+}
+
+// ── DATA LOADERS ─────────────────────────────────────────────
+async function loadStats(){
+  try{
+    const r=await api('/stats/dashboard');const d=await r.json();if(!r.ok)return;
+    document.getElementById('d-et').textContent=d.totaux.etudiants;
+    document.getElementById('d-pr').textContent=d.totaux.professeurs;
+    document.getElementById('d-tr').textContent=d.totaux.travailleurs;
+    document.getElementById('d-sc').textContent=d.aujourd_hui.total_scans;
+    document.getElementById('d-tot').textContent=d.total_presences;
+    document.getElementById('d-ab').textContent=d.aujourd_hui.absents_etudiants+d.aujourd_hui.absents_professeurs+d.aujourd_hui.absents_travailleurs;
+    document.getElementById('d-etp').textContent=d.aujourd_hui.etudiants_presents+' présents';
+    document.getElementById('d-prp').textContent=d.aujourd_hui.professeurs_presents+' présents';
+    document.getElementById('d-trp').textContent=d.aujourd_hui.travailleurs_presents+' présents';
+    document.getElementById('scan-pill').textContent='⚡ '+d.aujourd_hui.total_scans+' scans';
+    // Absence badge
+    const absTotal=d.aujourd_hui.absents_etudiants+d.aujourd_hui.absents_professeurs+d.aujourd_hui.absents_travailleurs;
+    document.getElementById('abs-count').textContent=absTotal;
+    // Weekly chart
+    const wr=await api('/stats/weekly');const wk=await wr.json();renderWeek(wk);
+    // Absents
+    const ar=await api('/stats/absents-today');allAbsents=await ar.json();renderAbsents();
+  }catch(e){console.error(e);}
+}
+
+async function loadUsers(){
+  try{const r=await api('/users');allUsers=await r.json();renderUsersTable('etudiant');renderUsersTable('professeur');renderUsersTable('travailleur');}catch{}
+}
+
+async function loadPres(){
+  try{const r=await api('/presence/today');allPres=await r.json();renderPres(allPres);updatePresSum(allPres);}catch{}
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function tbadge(t){const m={etudiant:['bb','🎓','Étudiant'],professeur:['bg','👨‍🏫','Professeur'],travailleur:['bo','💼','Travailleur']};const[c,i,l]=m[t]||['bb','?','?'];return`<span class="badge ${c}">${i} ${l}</span>`;}
+function mkAv(u){const ini=(u.nom_complet||'?').split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();return u.photo?`<div class="av"><img src="${u.photo}" alt=""></div>`:`<div class="av">${ini}</div>`;}
+
+function renderUsersTable(type){
+  const list=allUsers.filter(u=>u.type===type);
+  const ids={etudiant:'tb-etudiants',professeur:'tb-professeurs',travailleur:'tb-travailleurs'};
+  const tb=document.getElementById(ids[type]);if(!tb)return;
+  if(!list.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun ${type} enregistré</td></tr>`;return;}
+  tb.innerHTML=list.map(u=>{
+    const st=u.actif?`<span class="badge bg">✓ Actif</span>`:`<span class="badge br">✗ Inactif</span>`;
+    const extra=type==='etudiant'?`<td style="font-size:12px">${u.campus||'—'}</td><td style="font-size:12px">${u.filiere||'—'}</td><td><span class="badge bb">${u.niveau||'—'}</span></td>`:`<td style="font-size:12px">${u.email||'—'}</td><td style="font-size:12px">${u.telephone||'—'}</td><td style="font-size:12px">${u.sous_type||'—'}</td>`;
+    return`<tr><td><div class="uc">${mkAv(u)}<div><div class="un">${u.nom_complet}</div><div class="uid">${u.numero_id||''}</div></div></div></td>${extra}<td>${st}</td><td><div class="bact"><button class="btn btn-g btn-s btn-icon" onclick="viewProfile('${u.id}')" title="Profil">👁️</button><button class="btn btn-g btn-s btn-icon" onclick="showQR('${u.id}')" title="QR">🔍</button><button class="btn btn-g btn-s btn-icon" onclick="toggleUser('${u.id}')" title="Activer/Désactiver">⚡</button><button class="btn btn-d btn-s btn-icon" onclick="deleteUser('${u.id}','${u.nom_complet.replace(/'/g,"\\'")}')">🗑️</button></div></td></tr>`;
+  }).join('');
+}
+
+function renderPres(data){
+  const tb=document.getElementById('pres-tbody');if(!tb)return;
+  if(!data.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucune présence aujourd'hui</td></tr>`;return;}
+  const seen=new Set();
+  tb.innerHTML=[...data].reverse().map(p=>{
+    const dup=seen.has(p.user_id);seen.add(p.user_id);
+    return`<tr><td><div class="uc"><div class="av">${(p.nom_complet||'?').substring(0,2).toUpperCase()}</div><div class="un">${p.nom_complet||'—'}</div></div></td><td>${tbadge(p.type)}</td><td style="font-size:12px;color:var(--muted)">${p.campus||'—'}</td><td style="font-family:monospace;font-size:13px">${p.heure}</td><td>${dup?'<span class="badge bo">⚠️ Doublon</span>':'<span class="badge bg">✓ Présent</span>'}</td><td><button class="btn btn-g btn-s btn-icon" onclick="viewProfile('${p.user_id}')">👁️</button></td></tr>`;
+  }).join('');
+}
+
+function renderAbsents(){
+  const tb=document.getElementById('abs-tbody');if(!tb)return;
+  const chips=document.getElementById('abs-chips');
+  if(!allAbsents.length){
+    tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--green);padding:24px">✅ Tous les membres sont présents !</td></tr>`;
+    if(chips)chips.innerHTML='<span style="color:var(--green);font-size:12px">✅ Tout le monde est présent</span>';
+    return;
+  }
+  if(chips)chips.innerHTML=allAbsents.slice(0,8).map(u=>`<span class="abs-chip">${u.nom_complet}</span>`).join('')+(allAbsents.length>8?`<span class="abs-chip">+${allAbsents.length-8} autres</span>`:'');
+  tb.innerHTML=allAbsents.map(u=>`<tr><td><div class="uc">${mkAv(u)}<div><div class="un">${u.nom_complet}</div><div class="uid">${u.numero_id||''}</div></div></div></td><td>${tbadge(u.type)}</td><td style="font-size:12px;color:var(--muted)">${u.campus||'—'}</td><td style="font-size:12px">${u.email||'—'}</td><td style="font-size:12px">${u.telephone||'—'}</td><td><button class="btn btn-g btn-s btn-icon" onclick="viewProfile('${u.id}')">👁️</button></td></tr>`).join('');
+}
+
+function updatePresSum(data){
+  const uniq=type=>[...new Set(data.filter(p=>p.type===type).map(p=>p.user_id))].length;
+  const e=uniq('etudiant'),p=uniq('professeur'),t=uniq('travailleur'),tot=allUsers.length||1;
+  document.getElementById('ps-et').textContent=e;
+  document.getElementById('ps-pr').textContent=p;
+  document.getElementById('ps-tr').textContent=t;
+  document.getElementById('pb-et').style.width=Math.min(e/Math.max(allUsers.filter(u=>u.type==='etudiant').length,1)*100,100)+'%';
+  document.getElementById('pb-pr').style.width=Math.min(p/Math.max(allUsers.filter(u=>u.type==='professeur').length,1)*100,100)+'%';
+  document.getElementById('pb-tr').style.width=Math.min(t/Math.max(allUsers.filter(u=>u.type==='travailleur').length,1)*100,100)+'%';
+}
+
+function renderWeek(data){
+  const c=document.getElementById('wchart');if(!c)return;
+  const max=Math.max(...data.map(d=>d.count),1);
+  c.innerHTML=data.map(d=>`<div class="wbar"><div class="wb-n">${d.count}</div><div class="wb-fill" style="height:${Math.max((d.count/max)*110,4)}px"></div><div class="wb-l">${d.label}</div></div>`).join('');
+}
+
+function addFeed(name,type,time,status){
+  const f=document.getElementById('live-feed');
+  if(f.querySelector('[data-empty]'))f.innerHTML='';
+  const icons={etudiant:'🎓',professeur:'👨‍🏫',travailleur:'💼'};
+  const el=document.createElement('div');el.className='fi';
+  el.innerHTML=`<div class="fi-dot ${status}"></div><div class="fi-info"><div class="fi-name">${name||'Inconnu'}</div><div class="fi-meta">${icons[type]||'👤'} ${type||'—'}</div></div><div class="fi-time">${time||'--:--'}</div>`;
+  f.insertBefore(el,f.firstChild);
+  if(f.children.length>25)f.removeChild(f.lastChild);
+}
+
+// ── FILTERS ──────────────────────────────────────────────────
+function filterPres(q){renderPres(allPres.filter(p=>p.nom_complet?.toLowerCase().includes(q.toLowerCase())));}
+function filterPresType(t){renderPres(t?allPres.filter(p=>p.type===t):allPres);}
+function filterAbsType(t){const data=t?allAbsents.filter(u=>u.type===t):allAbsents;const tb=document.getElementById('abs-tbody');if(!tb)return;if(!data.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun absent dans cette catégorie</td></tr>`;return;}tb.innerHTML=data.map(u=>`<tr><td><div class="uc">${mkAv(u)}<div><div class="un">${u.nom_complet}</div><div class="uid">${u.numero_id||''}</div></div></div></td><td>${tbadge(u.type)}</td><td style="font-size:12px;color:var(--muted)">${u.campus||'—'}</td><td style="font-size:12px">${u.email||'—'}</td><td style="font-size:12px">${u.telephone||'—'}</td><td><button class="btn btn-g btn-s btn-icon" onclick="viewProfile('${u.id}')">👁️</button></td></tr>`).join('');}
+function filterUsers(q,type){const data=allUsers.filter(u=>u.type===type&&u.nom_complet?.toLowerCase().includes(q.toLowerCase()));const ids={etudiant:'tb-etudiants',professeur:'tb-professeurs',travailleur:'tb-travailleurs'};const tb=document.getElementById(ids[type]);if(!tb)return;if(!data.length){tb.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Aucun résultat</td></tr>`;return;}const saved=allUsers;allUsers=data;renderUsersTable(type);allUsers=saved;}
+
+// ── PROFILE ──────────────────────────────────────────────────
+async function viewProfile(id){
+  currentProfileId=id;prevView=currentView;
+  const user=allUsers.find(u=>u.id===id);
+  if(!user)return;
+  // Header
+  const hdr=document.getElementById('profile-header');
+  const typeColors={etudiant:'var(--blue)',professeur:'var(--green)',travailleur:'var(--orange)'};
+  hdr.innerHTML=`<div class="profile-av">${user.photo?`<img src="${user.photo}" alt="">`:user.nom_complet.substring(0,2).toUpperCase()}</div><div><div class="profile-name">${user.nom_complet}</div><div class="profile-meta">${tbadge(user.type)} ${user.sous_type?'· '+user.sous_type:''} ${user.campus?'· '+user.campus:''}</div><div class="profile-meta">${user.filiere?user.filiere+' ':''} ${user.niveau?'· '+user.niveau:''}</div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-g btn-s" onclick="showQR('${user.id}')">🔍 Voir QR</button><button class="btn btn-p btn-s" onclick="toggleUser('${user.id}')">⚡ ${user.actif?'Désactiver':'Activer'}</button></div></div>`;
+  goView('profile');
+  await loadProfileCal();
+}
+
+async function loadProfileCal(){
+  if(!currentProfileId)return;
+  const month=document.getElementById('cal-month')?.value;
+  const year=document.getElementById('cal-year')?.value;
+  const param=month&&year?`month=${year}-${month}`:year?`year=${year}`:'';
+  try{
+    const r=await api(`/stats/user/${currentProfileId}?${param}`);
+    const d=await r.json();if(!r.ok)return;
+    document.getElementById('prof-pres').textContent=d.total_present;
+    document.getElementById('prof-abs').textContent=d.total_absent;
+    document.getElementById('prof-pres-sub').textContent=`sur ${d.total_jours} jours ouvrables`;
+    document.getElementById('prof-abs-sub').textContent=`sur ${d.total_jours} jours ouvrables`;
+    renderCalendar(d.calendar,month,year);
+    // Hist
+    const hist=document.getElementById('prof-hist');
+    const sorted=[...d.presences].sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+    hist.innerHTML=sorted.length?sorted.map(p=>`<tr><td>${new Date(p.date).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</td><td style="font-family:monospace">${p.heure}</td><td><span class="badge bb">#${p.scan_count||1}</span></td></tr>`).join(''):`<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px">Aucun scan enregistré</td></tr>`;
+  }catch(e){console.error(e);}
+}
+
+function renderCalendar(days,month,year){
+  const g=document.getElementById('cal-grid');if(!g)return;
+  const today=new Date().toISOString().split('T')[0];
+  const wdays=['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  let html=wdays.map(d=>`<div class="cal-day-hdr">${d}</div>`).join('');
+  if(days.length>0){
+    const firstDate=new Date(days[0].date);
+    const dow=firstDate.getDay();const offset=(dow===0?6:dow-1);
+    for(let i=0;i<offset;i++)html+=`<div class="cal-day empty"></div>`;
+  }
+  days.forEach(d=>{
+    const dt=new Date(d.date);const dow=dt.getDay();const isWe=dow===0||dow===6;
+    const cls=`cal-day${d.present?' present':' absent'}${d.date===today?' today':''}${isWe?' weekend':''}`;
+    const dayNum=dt.getDate();
+    html+=`<div class="${cls}" title="${d.date}">${dayNum}</div>`;
+  });
+  g.innerHTML=html;
+}
+
+function goBack(){goView(prevView);}
+
+// ── ACTIONS ──────────────────────────────────────────────────
+async function toggleUser(id){const r=await api(`/users/${id}/toggle`,{method:'PATCH'});if(r.ok){await loadUsers();toast('Statut mis à jour','s');}else toast('Erreur','e');}
+async function deleteUser(id,name){
+  if(!confirm(`Supprimer ${name} ? Action irréversible.`))return;
+  const r=await api(`/users/${id}`,{method:'DELETE'});
+  if(r.ok){await loadUsers();toast(`${name} supprimé`,'s');}else toast('Erreur de suppression','e');
+}
+
+// ── QR CARD ──────────────────────────────────────────────────
+function showQR(id){
+  const u=allUsers.find(x=>x.id===id);if(!u)return;
+  const ini=u.nom_complet.substring(0,2).toUpperCase();
+  const av=u.photo?`<div class="qrc-av"><img src="${u.photo}" alt=""></div>`:`<div class="qrc-av">${ini}</div>`;
+  const typeLabel={etudiant:'ÉTUDIANT',professeur:'PROFESSEUR',travailleur:'TRAVAILLEUR'}[u.type]||u.type.toUpperCase();
+  document.getElementById('qr-modal-body').innerHTML=`
+    <div class="qr-card" id="printable-qr">
+      <div class="qrc-head">
+        <div class="qrc-logo"><div class="qrc-logobox">GSI</div><div class="qrc-logotxt">CARTE ${typeLabel}<small>GROUPE GSI INTERNATIONALE</small></div></div>
+      </div>
+      <div class="qrc-user">${av}<div><div class="qrc-name">${u.nom_complet}</div><div class="qrc-id">${u.numero_id||u.id.substring(0,8).toUpperCase()}</div></div></div>
+      <div class="qrc-body">
+        <div class="qrc-qr">${u.qr_image?`<img src="${u.qr_image}" alt="QR Code">`:'<p style="color:#666;font-size:13px">QR non disponible</p>'}</div>
+        <div class="qrc-info">
+          ${u.campus?`<div class="qrc-row"><span>📍</span>Campus: ${u.campus}</div>`:''}
+          ${u.filiere?`<div class="qrc-row"><span>🎓</span>${u.filiere}${u.niveau?' — '+u.niveau:''}</div>`:''}
+          ${u.email?`<div class="qrc-row"><span>✉️</span>${u.email}</div>`:''}
+          ${u.sous_type?`<div class="qrc-row"><span>💼</span>${u.sous_type}</div>`:''}
+        </div>
+        <div class="qrc-note">Présentez ce code pour la validation de présence</div>
+      </div>
+    </div>`;
+  document.getElementById('qr-modal').style.display='flex';
+}
+
+function printQR(){
+  const card=document.getElementById('printable-qr');
+  const w=window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Carte QR</title><link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;600&display=swap" rel="stylesheet"><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-family:Syne,Inter,sans-serif}${document.querySelector('style').textContent}</style></head><body>${card.outerHTML}<script>setTimeout(()=>{window.print()},600)<\/script></body></html>`);
+  w.document.close();
+}
+
+// ── CREATE USER ───────────────────────────────────────────────
+function openCreateModal(type='etudiant'){
+  document.getElementById('f-type').value=type;updateFields();
+  document.getElementById('create-modal').style.display='flex';
+}
+function updateFields(){
+  const t=document.getElementById('f-type').value;
+  document.getElementById('et-fields').style.display=t==='etudiant'?'block':'none';
+  document.getElementById('st-fields').style.display=t!=='etudiant'?'block':'none';
+}
+function previewPh(inp){
+  if(!inp.files?.[0])return;
+  const r=new FileReader();r.onload=e=>{document.getElementById('ph-prev-area').innerHTML=`<img src="${e.target.result}" class="ph-prev">`;};r.readAsDataURL(inp.files[0]);
+}
+async function createUser(){
+  const nom=document.getElementById('f-nom').value.trim();
+  const type=document.getElementById('f-type').value;
+  if(!nom){toast('Nom complet requis','e');return;}
+  const fd=new FormData();
+  fd.append('nom_complet',nom);fd.append('type',type);
+  fd.append('email',document.getElementById('f-email').value);
+  fd.append('telephone',document.getElementById('f-tel').value);
+  fd.append('adresse',document.getElementById('f-adr').value);
+  if(type==='etudiant'){fd.append('campus',document.getElementById('f-campus').value);fd.append('niveau',document.getElementById('f-niv').value);fd.append('filiere',document.getElementById('f-fil').value);}
+  else{fd.append('sous_type',document.getElementById('f-poste').value);if(document.getElementById('f-pwd').value)fd.append('mot_de_passe',document.getElementById('f-pwd').value);}
+  const ph=document.getElementById('ph-inp').files[0];if(ph)fd.append('photo',ph);
+  const r=await fetch('/api/users',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});
+  const d=await r.json();
+  if(!r.ok){toast(d.error||'Erreur création','e');return;}
+  toast(`${nom} créé avec succès`,'s');closeModal('create-modal');
+  resetForm();await loadUsers();
+}
+function resetForm(){
+  ['f-nom','f-email','f-tel','f-adr','f-niv','f-fil','f-poste','f-pwd'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('f-campus').value='ANTANANARIVO (ANALAKELY)';
+  document.getElementById('ph-prev-area').innerHTML='<div style="font-size:32px;margin-bottom:6px">📸</div><div style="font-size:12px;color:var(--muted)">Cliquer pour uploader</div>';
+  document.getElementById('ph-inp').value='';
+}
+
+// ── IMPORT STUDENT ────────────────────────────────────────────
+async function importStudent(){
+  const qr=document.getElementById('imp-qr').value.trim();
+  const num=document.getElementById('imp-num').value.trim();
+  if(!qr||!num){toast('QR code et numéro requis','e');return;}
+  const r=await api('/users/import-student',{method:'POST',body:JSON.stringify({qr_code:qr,numero_id:num,nom_complet:document.getElementById('imp-nom').value,campus:document.getElementById('imp-campus').value,niveau:document.getElementById('imp-niv').value,filiere:document.getElementById('imp-fil').value})});
+  const d=await r.json();
+  if(!r.ok){toast(d.error||'Erreur','e');return;}
+  toast('Étudiant importé avec succès','s');await loadUsers();
+}
+
+// ── SCANNER UPLOAD ────────────────────────────────────────────
+function handleQRFile(inp){
+  if(!inp.files?.[0])return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const cv=document.getElementById('qr-cv');cv.width=img.width;cv.height=img.height;
+      const ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+      const data=ctx.getImageData(0,0,cv.width,cv.height);
+      const code=jsQR(data.data,data.width,data.height);
+      const res=document.getElementById('qr-result');
+      if(code)processScanResult(code.data,res);
+      else res.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:11px;padding:16px;color:#FC8181">❌ QR code illisible — essayez une image de meilleure qualité</div>`;
+    };img.src=e.target.result;
+  };reader.readAsDataURL(inp.files[0]);inp.value='';
+}
+
+async function processScanResult(qr,resultEl){
+  const r=await api('/scan',{method:'POST',body:JSON.stringify({qr_code:qr})});
+  const d=await r.json();
+  if(d.success){resultEl.innerHTML=`<div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);border-radius:11px;padding:18px"><div style="font-size:22px;margin-bottom:7px">✅</div><div style="font-weight:700;color:#6EE7B7;font-size:15px">${d.message}</div><div style="color:var(--muted);font-size:12px;margin-top:5px">Type: ${d.user?.type} · Heure: ${d.presence?.heure} · Réponse: ${d.response_ms}ms</div></div>`;}
+  else{resultEl.innerHTML=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:11px;padding:18px"><div style="font-size:22px;margin-bottom:7px">❌</div><div style="font-weight:700;color:#FC8181">${d.error||'Rejeté'}</div></div>`;}
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+const viewTitles={dashboard:'Tableau de bord',presences:'Présences du jour',absences:'Absences',etudiants:'Étudiants',professeurs:'Professeurs',travailleurs:'Travailleurs','scanner-upload':'Scanner Upload','import-etudiant':'Import Étudiant',profile:'Profil membre'};
+function goView(name,niEl){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('act'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('act'));
+  const v=document.getElementById('view-'+name);if(v)v.classList.add('act');
+  if(niEl)niEl.classList.add('act');
+  document.getElementById('ptitle').textContent=viewTitles[name]||name;
+  currentView=name;closeSB();
+  if(name==='absences')renderAbsents();
+}
+function toggleSB(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sb-overlay').classList.toggle('show');}
+function closeSB(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sb-overlay').classList.remove('show');}
+function closeModal(id){document.getElementById(id).style.display='none';}
+
+// ── TOAST ─────────────────────────────────────────────────────
+function toast(msg,type='s'){
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;
+  el.innerHTML=`${type==='s'?'✅':'❌'} ${msg}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(),3200);
+}
+
+// ── AUTO-REFRESH ──────────────────────────────────────────────
+autoLogin();
+setInterval(()=>{if(token){loadStats();if(currentView==='presences'||currentView==='absences')loadPres();}},20000);
+</script>
+</body>
+</html>
